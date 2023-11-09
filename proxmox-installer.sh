@@ -88,10 +88,13 @@ run_command() {
 }
 
 configure_fastapi_dls() {
+    # Get the IP address of the Proxmox server (vmbr0)
+    PROXMOX_IP=$(ip addr show vmbr0 | grep -o 'inet [0-9.]*' | awk '{print $2}')
+
     # Prompt the user for DLS_URL with default value 127.0.0.1
     echo -e "${YELLOW}[-]${NC} On which IP address should FastAPI-DLS listen? (press Enter for default)"
-    read -p "Enter your choice (default is 0.0.0.0): " DLS_URL
-    DLS_URL=${DLS_URL:-0.0.0.0}
+    read -p "Enter your choice (default is $PROXMOX_IP): " DLS_URL
+    DLS_URL=${DLS_URL:-$PROXMOX_IP}
 
     # Prompt the user for DLS_PORT with default value 443
     echo -e "${YELLOW}[-]${NC} On which port should FastAPI-DLS listen? (press Enter for default)"
@@ -133,18 +136,15 @@ configure_fastapi_dls() {
         echo -e "${YELLOW}[-]${NC} Check: 'journalctl -u fastapi-dls.service -n 100'"
     fi
 
-    # Get the IP address of the Proxmox server (vmbr0)
-    PROXMOX_IP=$(ip addr show vmbr0 | grep -o 'inet [0-9.]*' | awk '{print $2}')
-
     # Function to prompt for user confirmation
     confirm_action() {
         local message="$1"
         echo -en "${GREEN}[?]${NC} $message (y/n): "
         read confirmation
         if [ "$confirmation" = "y" ] || [ "$confirmation" = "Y" ]; then
-            return 0  # Return success
+            return 0
         else
-            return 1  # Return failure
+            return 1
         fi
     }
 
@@ -724,19 +724,19 @@ case $STEP in
         # Check DRIVER_VERSION against specific driver filenames
         if [ "$DRIVER_VERSION" == "NVIDIA-Linux-x86_64-535.104.06-vgpu-kvm.run" ]; then
             echo -e "${GREEN}[+]${NC} In your VM download Nvidia guest driver for version: 535.104.06"
-            echo -e "${YELLOW}[-]${NC} Debian/Ubuntu: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU16.1/NVIDIA-Linux-x86_64-535.104.05-grid.run"
+            echo -e "${YELLOW}[-]${NC} Linux: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU16.1/NVIDIA-Linux-x86_64-535.104.05-grid.run"
             echo -e "${YELLOW}[-]${NC} Windows: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU16.1/537.13_grid_win10_win11_server2019_server2022_dch_64bit_international.exe"
         elif [ "$DRIVER_VERSION" == "NVIDIA-Linux-x86_64-535.54.06-vgpu-kvm.run" ]; then
             echo -e "${GREEN}[+]${NC} In your VM download Nvidia guest driver for version: 535.54.06"
-            echo -e "${YELLOW}[-]${NC} Debian/Ubuntu: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU16.0/NVIDIA-Linux-x86_64-535.54.03-grid.run"
+            echo -e "${YELLOW}[-]${NC} Linux: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU16.0/NVIDIA-Linux-x86_64-535.54.03-grid.run"
             echo -e "${YELLOW}[-]${NC} Windows: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU16.0/536.25_grid_win10_win11_server2019_server2022_dch_64bit_international.exe"
         elif [ "$DRIVER_VERSION" == "NVIDIA-Linux-x86_64-525.85.07-vgpu-kvm.run" ]; then
             echo -e "${GREEN}[+]${NC} In your VM download Nvidia guest driver for version: 525.85.07"
-            echo -e "${YELLOW}[-]${NC} Debian/Ubuntu: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU15.1/NVIDIA-Linux-x86_64-525.85.05-grid.run"
+            echo -e "${YELLOW}[-]${NC} Linux: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU15.1/NVIDIA-Linux-x86_64-525.85.05-grid.run"
             echo -e "${YELLOW}[-]${NC} Windows: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU15.1/528.24_grid_win10_win11_server2019_server2022_dch_64bit_international.exe"
         elif [ "$DRIVER_VERSION" == "NVIDIA-Linux-x86_64-525.60.12-vgpu-kvm.run" ]; then
             echo -e "${GREEN}[+]${NC} In your VM download Nvidia guest driver for version: 525.60.12"
-            echo -e "${YELLOW}[-]${NC} Debian/Ubuntu: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU15.0/NVIDIA-Linux-x86_64-525.60.13-grid.run"
+            echo -e "${YELLOW}[-]${NC} Linux: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU15.0/NVIDIA-Linux-x86_64-525.60.13-grid.run"
             echo -e "${YELLOW}[-]${NC} Windows: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU15.0/527.41_grid_win10_win11_server2019_server2022_dch_64bit_international.exe"
         else
             echo -e "${RED}[!]${NC} Unknown driver version: $DRIVER_VERSION"
