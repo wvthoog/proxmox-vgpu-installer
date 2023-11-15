@@ -14,6 +14,7 @@ STEP="${STEP:-1}"
 URL="${URL:-}"
 FILE="${FILE:-}"
 DRIVER_VERSION="${DRIVER_VERSION:-}"
+SCRIPT_VERSION=1.0
 
 # Color codes
 RED='\033[0;31m'
@@ -213,7 +214,7 @@ echo -e "${YELLOW}| |/ /${GREEN} /_/ / ____/ /_/ /  _/ // / / (__  ) /_/ /_/ / /
 echo -e "${YELLOW}|___/${GREEN}\____/_/    \____/  /___/_/ /_/____/\__/\__,_/_/_/\___/_/      ${NC}"
 echo -e "${BLUE}by wvthoog.nl${NC}"
 echo -e ""
-echo -e "Welcome to the Nvidia vGPU installer for Proxmox"
+echo -e "Welcome to the Nvidia vGPU installer version $SCRIPT_VERSION for Proxmox"
 echo -e "This system is running Proxmox version ${version} with kernel ${kernel}"
 echo ""
 
