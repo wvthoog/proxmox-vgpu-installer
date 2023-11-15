@@ -87,84 +87,115 @@ run_command() {
     fi
 }
 
+# Check Proxmox version
+pve_info=$(pveversion)
+version=$(echo "$pve_info" | sed -n 's/^pve-manager\/\([0-9.]*\).*$/\1/p')
+#version=7.4-15
+kernel=$(echo "$pve_info" | sed -n 's/^.*kernel: \([0-9.-]*pve\).*$/\1/p')
+major_version=$(echo "$version" | sed 's/\([0-9]*\).*/\1/')
+
+# License the vGPU
 configure_fastapi_dls() {
-    # Get the IP address of the Proxmox server (vmbr0)
-    PROXMOX_IP=$(ip addr show vmbr0 | grep -o 'inet [0-9.]*' | awk '{print $2}')
+    if [[ $version == 8* ]]; then
+        # Get the IP address of the Proxmox server (vmbr0)
+        PROXMOX_IP=$(ip addr show vmbr0 | grep -o 'inet [0-9.]*' | awk '{print $2}')
 
-    # Prompt the user for DLS_URL with default value 127.0.0.1
-    echo -e "${YELLOW}[-]${NC} On which IP address should FastAPI-DLS listen? (press Enter for default)"
-    read -p "Enter your choice (default is $PROXMOX_IP): " DLS_URL
-    DLS_URL=${DLS_URL:-$PROXMOX_IP}
+        # Prompt the user for DLS_URL with default value 127.0.0.1
+        echo -e "${YELLOW}[-]${NC} On which IP address should FastAPI-DLS listen? (press Enter for default)"
+        read -p "Enter your choice (default is $PROXMOX_IP): " DLS_URL
+        DLS_URL=${DLS_URL:-$PROXMOX_IP}
 
-    # Prompt the user for DLS_PORT with default value 443
-    echo -e "${YELLOW}[-]${NC} On which port should FastAPI-DLS listen? (press Enter for default)"
-    read -p "Enter your choice (default is 8443): " DLS_PORT
-    DLS_PORT=${DLS_PORT:-8443}
+        # Prompt the user for DLS_PORT with default value 443
+        echo -e "${YELLOW}[-]${NC} On which port should FastAPI-DLS listen? (press Enter for default)"
+        read -p "Enter your choice (default is 8443): " DLS_PORT
+        DLS_PORT=${DLS_PORT:-8443}
 
-    # APT Update
-    run_command "Running APT Update" "info" "apt update"
+        # Remove a previous version of FastAPI-DLS if any
+        run_command "Remove a previous version of FastAPI-DLS if any" "info" "apt remove --purge fastapi-dls -y && apt autoremove -y"
+        #run_command "Run apt autoremove" "info" "apt autoremove -y"
 
-    # Downloading FastAPI-DLS deb package
-    run_command "Downloading FastAPI-DLS deb package" "info" "wget https://git.collinwebdesigns.de/oscar.krause/fastapi-dls/-/package_files/229/download -O $HOME/fastapi-dls_1.3.8_amd64.deb"
+        directory="/etc/fastapi-dls"
 
-    # Installing FastAPI-DLS
-    run_command "Installing FastAPI-DLS" "info" "dpkg -i $HOME/fastapi-dls_1.3.8_amd64.deb"
+        # Check if the FastAPI-DLS directory exists and has files
+        if [ -d "$directory" ] && [ -n "$(ls -A $directory)" ]; then
+            rm -rf $directory
 
-    # Running APT --fix-missing and creating certificate
-    run_command "Running APT --fix-missing" "info" "echo -e 'Y\n\n\n\n\n\n\n' | apt install -f --fix-missing -y"
-    
-    # Change DLS_URL
-    run_command "Changing DLS_URL to 0.0.0.0" "info" "sed -i '/^DLS_URL=/c\DLS_URL=$DLS_URL' /etc/fastapi-dls/env"
-
-    # Change DLS_PORT
-    run_command "Changing DLS_PORT to 8443" "info" "sed -i '/^DLS_PORT=/c\DLS_PORT=$DLS_PORT' /etc/fastapi-dls/env"
-
-    # Restart FastAPI-DLS Service
-    run_command "Restart FastAPI-DLS Service" "info" "systemctl restart fastapi-dls.service"
-
-    # Enable FastAPI-DLS Service
-    run_command "Enable FastAPI-DLS Service" "info" "systemctl enable fastapi-dls.service"
-
-    # Check the status of the fastapi-dls service
-    status=$(systemctl status fastapi-dls 2>/dev/null | grep 'Active: active (running)')
-
-    # Check if the status contains "Active: active (running)"
-    if [[ "$status" == *"Active: active (running)"* ]]; then
-        echo -e "${GREEN}[+]${NC} FastAPI-DLS successfully installed and running"
-    else
-        echo -e "${RED}[!]${NC} FastAPI-DLS is not running."
-        echo -e "${YELLOW}[-]${NC} Check: 'journalctl -u fastapi-dls.service -n 100'"
-    fi
-
-    # Function to prompt for user confirmation
-    confirm_action() {
-        local message="$1"
-        echo -en "${GREEN}[?]${NC} $message (y/n): "
-        read confirmation
-        if [ "$confirmation" = "y" ] || [ "$confirmation" = "Y" ]; then
-            return 0
+            echo -e "${GREEN}[+]${NC} Removing old FastAPI-DLS"
         else
-            return 1
+            echo -e "${GREEN}[+]${NC} No old FastAPI-DLS files found in $directory"
         fi
-    }
 
-    # Show Linux
-    if confirm_action "Show which commands to run on a Linux VM to license the vGPU using the Shell?"; then
-        echo ""
-        echo 'curl --insecure -L -X GET "https://'"$PROXMOX_IP"'":"'"$DLS_PORT"'"/-/client-token" -o "/etc/nvidia/ClientConfigToken/client_configuration_token_$(date '\''+%d-%m-%Y-%H-%M-%S'\'').tok"'
-        echo "service nvidia-gridd restart"
-        echo "nvidia-smi -q | grep "License""
-        echo ""
+        # APT Update
+        run_command "Running APT Update" "info" "apt update"
+
+        # Downloading FastAPI-DLS deb package
+        run_command "Downloading FastAPI-DLS deb package" "info" "wget https://git.collinwebdesigns.de/oscar.krause/fastapi-dls/-/package_files/229/download -O $HOME/fastapi-dls_1.3.8_amd64.deb"
+
+        # Installing FastAPI-DLS
+        run_command "Installing FastAPI-DLS" "info" "dpkg -i $HOME/fastapi-dls_1.3.8_amd64.deb"
+
+        # Running APT --fix-missing and creating certificate
+        run_command "Running APT --fix-missing" "info" "echo -e 'Y\n\n\n\n\n\n\n' | apt install -f --fix-missing -y"
+
+        # Change DLS_URL
+        run_command "Changing DLS_URL to 0.0.0.0" "info" "sed -i '/^DLS_URL=/c\DLS_URL=$DLS_URL' $directory/env"
+
+        # Change DLS_PORT
+        run_command "Changing DLS_PORT to 8443" "info" "sed -i '/^DLS_PORT=/c\DLS_PORT=$DLS_PORT' $directory/env"
+
+        # Daemon-reload
+        run_command "Systemctl daemon-reload" "info" "systemctl daemon-reload"
+
+        # Restart FastAPI-DLS Service
+        run_command "Restart FastAPI-DLS Service" "info" "systemctl restart fastapi-dls.service"
+
+        # Enable FastAPI-DLS Service
+        run_command "Enable FastAPI-DLS Service" "info" "systemctl enable fastapi-dls.service"
+
+        # Check the status of the fastapi-dls service
+        status=$(systemctl status fastapi-dls 2>/dev/null | grep 'Active: active (running)')
+
+        # Check if the status contains "Active: active (running)"
+        if [[ "$status" == *"Active: active (running)"* ]]; then
+            echo -e "${GREEN}[+]${NC} FastAPI-DLS successfully installed and running"
+        else
+            echo -e "${RED}[!]${NC} FastAPI-DLS is not running."
+            echo -e "${RED}[!]${NC} Check: 'journalctl -u fastapi-dls.service -n 100'"
+        fi
+
+        # Function to prompt for user confirmation
+        confirm_action() {
+            local message="$1"
+            echo -en "${YELLOW}[?]${NC} $message (y/n): "
+            read confirmation
+            if [ "$confirmation" = "y" ] || [ "$confirmation" = "Y" ]; then
+                return 0
+            else
+                return 1
+            fi
+        }
+
+        # Show Linux
+        if confirm_action "Show which commands to run on a Linux VM to license the vGPU using the Shell?"; then
+            echo ""
+            echo 'curl --insecure -L -X GET https://'$PROXMOX_IP':'$DLS_PORT'/-/client-token -o /etc/nvidia/ClientConfigToken/client_configuration_token_$(date '\''+%d-%m-%Y-%H-%M-%S'\'').tok'
+            echo "service nvidia-gridd restart"
+            echo 'nvidia-smi -q | grep "License"'
+            echo ""
+        fi
+
+        # Show Windows
+        if confirm_action "Show which commands to run on a Windows VM to license the vGPU using Powershell?"; then
+            echo ""
+            echo 'curl.exe --insecure -L -X GET https://'$PROXMOX_IP':'$DLS_PORT'/-/client-token -o "C:\Program Files\NVIDIA Corporation\vGPU Licensing\ClientConfigToken\client_configuration_token_$(Get-Date -f '\''dd-MM-yy-hh-mm-ss'\'').tok"'
+            echo "Restart-Service NVDisplay.ContainerLocalSystem"
+            echo '& 'nvidia-smi' -q  | Select-String "License"'
+            echo ""
+        fi
+    else
+        echo -e "${RED}[!]${NC} Licensing only works on Proxmox 8.x (Bookworm)."
     fi
 
-    # Show Windows
-    if confirm_action "Show which commands to run on a Windows VM to license the vGPU using Powershell?"; then
-        echo ""
-        echo 'curl.exe --insecure -L -X GET https://'"$PROXMOX_IP"':'"$DLS_PORT"'/-/client-token" -o "C:\Program Files\NVIDIA Corporation\vGPU Licensing\ClientConfigToken\client_configuration_token_$(Get-Date -f "dd-MM-yy-hh-mm-ss").tok"'
-        echo "Restart-Service NVDisplay.ContainerLocalSystem"
-        echo "& 'nvidia-smi' -q  | Select-String "License""
-        echo ""
-    fi
 }
 
 # Check for root
@@ -172,12 +203,6 @@ if [[ $EUID -ne 0 ]]; then
     echo "This script must be run as root. Please use sudo or execute as root user."
     exit 1
 fi
-
-# Check Proxmox version
-pve_info=$(pveversion)
-version=$(echo "$pve_info" | sed -n 's/^pve-manager\/\([0-9.]*\).*$/\1/p')
-kernel=$(echo "$pve_info" | sed -n 's/^.*kernel: \([0-9.-]*pve\).*$/\1/p')
-major_version=$(echo "$version" | sed 's/\([0-9]*\).*/\1/')
 
 # Welcome message and disclaimer
 echo -e ""
@@ -309,6 +334,11 @@ case $STEP in
                 echo -e "[Service]\nEnvironment=LD_PRELOAD=/opt/vgpu_unlock-rs/target/release/libvgpu_unlock_rs.so" > /etc/systemd/system/nvidia-vgpud.service.d/vgpu_unlock.conf
                 echo -e "[Service]\nEnvironment=LD_PRELOAD=/opt/vgpu_unlock-rs/target/release/libvgpu_unlock_rs.so" > /etc/systemd/system/nvidia-vgpu-mgr.service.d/vgpu_unlock.conf
                
+                # Systemctl
+                run_command "Systemctl daemon-reload" "info" "systemctl daemon-reload"
+                run_command "Enable nvidia-vgpud.service" "info" "systemctl enable nvidia-vgpud.service"
+                run_command "Enable nvidia-vgpu-mgr.service" "info" "systemctl enable nvidia-vgpu-mgr.service"
+
                 # Checking CPU architecture
                 echo -e "${GREEN}[+]${NC} Checking CPU architecture"
                 vendor_id=$(cat /proc/cpuinfo | grep vendor_id | awk 'NR==1{print $3}')
@@ -371,11 +401,11 @@ case $STEP in
 
             read -p "Reboot your machine now? (y/n): " reboot_choice
             if [ "$reboot_choice" = "y" ]; then
-                echo "STEP=2" >> "$HOME/$CONFIG_FILE"
+                echo "STEP=2" > "$HOME/$CONFIG_FILE"
                 reboot
             else
                 echo "Exiting the script. Remember to reboot your machine later."
-                echo "STEP=2" >> "$HOME/$CONFIG_FILE"
+                echo "STEP=2" > "$HOME/$CONFIG_FILE"
                 exit 0
             fi
             ;;
@@ -584,7 +614,7 @@ case $STEP in
                 exit 1
             fi
         
-            echo -e "${YELLOW}[-]${NC} Driver version: $driver_version"
+            echo -e "${YELLOW}[-]${NC} Driver version: $driver_filename"
 
         else
             # Offer to download vGPU driver versions based on Proxmox version
@@ -662,9 +692,21 @@ case $STEP in
                     # continue  # Restart the loop
                     ;;
             esac
+
+            # Check if $driver_filename exists
+            if [ -e "$driver_filename" ]; then
+                mv "$driver_filename" "$driver_filename.bak"
+                echo -e "${YELLOW}[-]${NC} Moved $driver_filename to $driver_filename.bak"
+            fi
+
+            # Check if $custom_filename exists
+            if [ -e "$custom_filename" ]; then
+                mv "$custom_filename" "$custom_filename.bak"
+                echo -e "${YELLOW}[-]${NC} Moved $custom_filename to $custom_filename.bak"
+            fi
             
             # Download and install the selected vGPU driver version
-            echo -e "${GREEN}[+]${NC} Downloading vGPU $driver_version host driver using megadl"
+            echo -e "${GREEN}[+]${NC} Downloading vGPU $driver_filename host driver using megadl"
             megadl "$driver_url"
         fi
 
@@ -680,70 +722,50 @@ case $STEP in
         # Run the patched driver installer
         run_command "Installing driver" "info" "./$custom_filename --dkms -s"
 
-        echo -e "${GREEN}[+]${NC} Driver installed successfully."
+        #echo -e "${GREEN}[+]${NC} Driver installed successfully."
 
-        echo ""
-        echo "Step 2 completed. Reboot your machine to finish the installation."
-        echo ""
-        echo "After reboot, run the script again to make configuration changes."
-        echo ""
-
-        read -p "Reboot your machine now? (y/n): " reboot_choice
-        if [ "$reboot_choice" = "y" ]; then
-            echo "STEP=3" > "$HOME/$CONFIG_FILE"
-            echo "DRIVER=$driver_filename" >> "$HOME/$CONFIG_FILE"
-            reboot
-        else
-            echo "Exiting the script. Remember to reboot your machine later."
-            echo "STEP=3" > "$HOME/$CONFIG_FILE"
-            echo "DRIVER=$driver_filename" >> "$HOME/$CONFIG_FILE"
-            exit 0
-        fi
-        ;;
- 
-    3)
-        # Step 3: Final step after the second reboot of a new installation
-        echo ""
-        echo "You are currently at step ${STEP} of the installation process"
-        echo ""
-        echo "Proceeding with the installation"
-        echo ""
-
-        # Installed host driver
-        DRIVER_VERSION="${DRIVER:-}"
-        echo -e "${GREEN}[+]${NC} Nvidia driver version: $DRIVER_VERSION"
+        echo -e "${GREEN}[+]${NC} Nvidia driver version: $driver_filename"
 
         nvidia_smi_output=$(nvidia-smi vgpu 2>&1)
 
+        # Extract version from FILE
+        FILE_VERSION=$(echo "$driver_filename" | grep -oP '\d+\.\d+\.\d+')
+
         if [[ "$nvidia_smi_output" == *"NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."* ]] || [[ "$nvidia_smi_output" == *"No supported devices in vGPU mode"* ]]; then
             echo -e "${RED}[+]${NC} Nvidia driver not properly loaded"
+        elif [[ "$nvidia_smi_output" == *"Driver Version: $FILE_VERSION"* ]]; then
+            echo -e "${GREEN}[+]${NC} Nvidia driver properly loaded, version matches $FILE_VERSION"
         else
             echo -e "${GREEN}[+]${NC} Nvidia driver properly loaded"
         fi
 
+        # Start nvidia-services
+        run_command "Enable nvidia-vgpud.service" "info" "systemctl start nvidia-vgpud.service"
+        run_command "Enable nvidia-vgpu-mgr.service" "info" "systemctl start nvidia-vgpu-mgr.service"
+
         # Check DRIVER_VERSION against specific driver filenames
-        if [ "$DRIVER_VERSION" == "NVIDIA-Linux-x86_64-535.104.06-vgpu-kvm.run" ]; then
+        if [ "$driver_filename" == "NVIDIA-Linux-x86_64-535.104.06-vgpu-kvm.run" ]; then
             echo -e "${GREEN}[+]${NC} In your VM download Nvidia guest driver for version: 535.104.06"
             echo -e "${YELLOW}[-]${NC} Linux: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU16.1/NVIDIA-Linux-x86_64-535.104.05-grid.run"
             echo -e "${YELLOW}[-]${NC} Windows: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU16.1/537.13_grid_win10_win11_server2019_server2022_dch_64bit_international.exe"
-        elif [ "$DRIVER_VERSION" == "NVIDIA-Linux-x86_64-535.54.06-vgpu-kvm.run" ]; then
+        elif [ "$driver_filename" == "NVIDIA-Linux-x86_64-535.54.06-vgpu-kvm.run" ]; then
             echo -e "${GREEN}[+]${NC} In your VM download Nvidia guest driver for version: 535.54.06"
             echo -e "${YELLOW}[-]${NC} Linux: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU16.0/NVIDIA-Linux-x86_64-535.54.03-grid.run"
             echo -e "${YELLOW}[-]${NC} Windows: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU16.0/536.25_grid_win10_win11_server2019_server2022_dch_64bit_international.exe"
-        elif [ "$DRIVER_VERSION" == "NVIDIA-Linux-x86_64-525.85.07-vgpu-kvm.run" ]; then
+        elif [ "$driver_filename" == "NVIDIA-Linux-x86_64-525.85.07-vgpu-kvm.run" ]; then
             echo -e "${GREEN}[+]${NC} In your VM download Nvidia guest driver for version: 525.85.07"
             echo -e "${YELLOW}[-]${NC} Linux: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU15.1/NVIDIA-Linux-x86_64-525.85.05-grid.run"
             echo -e "${YELLOW}[-]${NC} Windows: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU15.1/528.24_grid_win10_win11_server2019_server2022_dch_64bit_international.exe"
-        elif [ "$DRIVER_VERSION" == "NVIDIA-Linux-x86_64-525.60.12-vgpu-kvm.run" ]; then
+        elif [ "$driver_filename" == "NVIDIA-Linux-x86_64-525.60.12-vgpu-kvm.run" ]; then
             echo -e "${GREEN}[+]${NC} In your VM download Nvidia guest driver for version: 525.60.12"
             echo -e "${YELLOW}[-]${NC} Linux: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU15.0/NVIDIA-Linux-x86_64-525.60.13-grid.run"
             echo -e "${YELLOW}[-]${NC} Windows: https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU15.0/527.41_grid_win10_win11_server2019_server2022_dch_64bit_international.exe"
         else
-            echo -e "${RED}[!]${NC} Unknown driver version: $DRIVER_VERSION"
+            echo -e "${RED}[!]${NC} Unknown driver version: $driver_filename"
         fi
 
         echo ""
-        echo "Step 3 completed and installation process is now finished."
+        echo "Step 2 completed and installation process is now finished."
         echo ""
         echo "List all available mdevs by typing: mdevctl types"
         echo "and choose one that fits your needs and VRAM capabilities"
