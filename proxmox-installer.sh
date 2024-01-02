@@ -288,7 +288,7 @@ case $STEP in
                 run_command "Running APT Dist-Upgrade (...this might take some time)" "info" "apt dist-upgrade -y"
             else
                 echo -e "${YELLOW}[-]${NC} Skipping apt Dist-Upgrade"
-            fi          
+            fi
 
             # APT installing packages
             run_command "Installing packages" "info" "apt install -y git build-essential dkms pve-headers mdevctl megatools"
@@ -304,12 +304,12 @@ case $STEP in
             fi
 
             # Download vgpu-proxmox
-            rm -rf $HOME/vgpu-proxmox 2>/dev/null 
+            rm -rf $HOME/vgpu-proxmox 2>/dev/null
             run_command "Downloading vgpu-proxmox" "info" "git clone https://gitlab.com/polloloco/vgpu-proxmox.git $HOME/vgpu-proxmox"
 
             # Download vgpu_unlock-rs
             cd /opt
-            rm -rf vgpu_unlock-rs 2>/dev/null 
+            rm -rf vgpu_unlock-rs 2>/dev/null
             run_command "Downloading vgpu_unlock-rs" "info" "git clone https://github.com/mbilker/vgpu_unlock-rs.git "
 
             # Download and source Rust
@@ -334,7 +334,7 @@ case $STEP in
                 echo -e "${GREEN}[+]${NC} Adding vgpu_unlock-rs library"
                 echo -e "[Service]\nEnvironment=LD_PRELOAD=/opt/vgpu_unlock-rs/target/release/libvgpu_unlock_rs.so" > /etc/systemd/system/nvidia-vgpud.service.d/vgpu_unlock.conf
                 echo -e "[Service]\nEnvironment=LD_PRELOAD=/opt/vgpu_unlock-rs/target/release/libvgpu_unlock_rs.so" > /etc/systemd/system/nvidia-vgpu-mgr.service.d/vgpu_unlock.conf
-               
+
                 # Systemctl
                 run_command "Systemctl daemon-reload" "info" "systemctl daemon-reload"
                 run_command "Enable nvidia-vgpud.service" "info" "systemctl enable nvidia-vgpud.service"
@@ -365,7 +365,7 @@ case $STEP in
                 else
                     echo -e "${RED}[!]${NC} Unknown CPU architecture. Unable to configure GRUB"
                     exit 1
-                fi           
+                fi
                 # Update GRUB
                 run_command "Updating GRUB" "info" "update-grub"
             fi
@@ -411,7 +411,7 @@ case $STEP in
             fi
             ;;
 
-        3)           
+        3)
             echo ""
             echo "Clean vGPU installation"
             echo ""
@@ -451,14 +451,14 @@ case $STEP in
 
             exit 0
             ;;
-        4)  
+        4)
             echo ""
-            echo "This will setup a FastAPI-DLS Nvidia vGPU licensing server on this Promox server"         
+            echo "This will setup a FastAPI-DLS Nvidia vGPU licensing server on this Promox server"
             echo ""
             echo -e "${GREEN}[+]${NC} Licensing vGPU"
 
             configure_fastapi_dls
-            
+
             exit 0
             ;;
         5)
@@ -506,7 +506,7 @@ case $STEP in
                 echo -e "${RED}[!]${NC} Unknown CPU architecture."
                 echo ""
                 exit 1
-            fi   
+            fi
             echo -n -e "${RED}[!]${NC} IOMMU is disabled. Do you want to continue anyway? (y/n): "
             read -r continue_choice
             if [ "$continue_choice" != "y" ]; then
@@ -614,7 +614,7 @@ case $STEP in
                 echo "No patches available for your vGPU driver version"
                 exit 1
             fi
-        
+
             echo -e "${YELLOW}[-]${NC} Driver version: $driver_filename"
 
         else
@@ -647,6 +647,7 @@ case $STEP in
                         driver_url="https://mega.nz/file/wy1WVCaZ#Yq2Pz_UOfydHy8nC_X_nloR4NIFC1iZFHqJN0EiAicU"
                     fi
                     driver_filename="NVIDIA-Linux-x86_64-535.104.06-vgpu-kvm.run"
+                    SHA256_CHECKSUM="4c87bc5da281a268d2dfe9252159dcfb38f7fa832fedfe97568689bd035bf087"
                     driver_patch="535.104.06.patch"
                     ;;
                 2)
@@ -655,8 +656,9 @@ case $STEP in
                         driver_url="$URL"
                     else
                         driver_url="https://mega.nz/file/xrNCCAaT#UuUjqRap6urvX4KA1m8-wMTCW5ZwuWKUj6zAB4-NPSo"
-                    fi                
+                    fi
                     driver_filename="NVIDIA-Linux-x86_64-535.54.06-vgpu-kvm.run"
+                    SHA256_CHECKSUM=""
                     driver_patch="535.54.06.patch"
                     ;;
                 3)
@@ -665,8 +667,9 @@ case $STEP in
                         driver_url="$URL"
                     else
                         driver_url="https://mega.nz/file/h6UVwS4a#ieGy_Q28p5v0TGrNCO0BuCFTTqXH9VXO2Jx-fgWTvZc"
-                    fi                   
+                    fi
                     driver_filename="NVIDIA-Linux-x86_64-525.85.07-vgpu-kvm.run"
+                    SHA256_CHECKSUM=""
                     driver_patch="525.85.07.patch"
                     ;;
                 4)
@@ -675,8 +678,9 @@ case $STEP in
                         driver_url="$URL"
                     else
                         driver_url="https://mega.nz/file/FzVlRZ4T#-mCwwGee9UVo34NuDuT-kQ-y9kbEswlwu7ii8KnfBbM"
-                    fi                  
+                    fi
                     driver_filename="NVIDIA-Linux-x86_64-525.60.12-vgpu-kvm.run"
+                    SHA256_CHECKSUM=""
                     driver_patch="525.60.12.patch"
                     ;;
                 *)
@@ -694,8 +698,11 @@ case $STEP in
                     ;;
             esac
 
-            # Check if $driver_filename exists
-            if [ -e "$driver_filename" ]; then
+            echo -n "$SHA256_CHECKSUM  $driver_filename" | sha256sum --check --status
+            checksum_ok=$?
+
+            # Remove old driver file if $driver_filename exists and checksum doesn't match
+            if [ -e "$driver_filename" ] && [ 0 -ne $checksum_ok ]; then
                 mv "$driver_filename" "$driver_filename.bak"
                 echo -e "${YELLOW}[-]${NC} Moved $driver_filename to $driver_filename.bak"
             fi
@@ -705,15 +712,17 @@ case $STEP in
                 mv "$custom_filename" "$custom_filename.bak"
                 echo -e "${YELLOW}[-]${NC} Moved $custom_filename to $custom_filename.bak"
             fi
-            
-            # Download and install the selected vGPU driver version
-            echo -e "${GREEN}[+]${NC} Downloading vGPU $driver_filename host driver using megadl"
-            megadl "$driver_url"
+
+            # Download and install the selected vGPU driver version if not existing already
+            if [ ! -e "$driver_filename" ]; then
+              echo -e "${GREEN}[+]${NC} Downloading vGPU $driver_filename host driver using megadl"
+              megadl "$driver_url"
+            fi
         fi
 
         # Make driver executable
         chmod +x $driver_filename
-        
+
         # Patch and install the driver
         run_command "Patching driver" "info" "./$driver_filename --apply-patch ~/vgpu-proxmox/$driver_patch"
 
