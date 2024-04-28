@@ -8,6 +8,7 @@ Changes in version 1.1
     16.4
     17.0
 - Added checks for multiple GPU's
+- Added MD5 checksums on downloaded files
 - Created database to check for PCI ID's to determine if a GPU is natively supported
 - If multiple GPU's are detected, pass through the rest using UDEV rules
 - Always write config.txt to script directory
