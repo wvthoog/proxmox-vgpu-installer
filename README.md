@@ -9,6 +9,7 @@ Changes in version 1.1
     17.0
 - Added checks for multiple GPU's
 - Created database to check for PCI ID's to determine if a GPU is natively supported
-- Write config.txt always to script directory
+- If multiple GPU's are detected, pass through the rest using UDEV rules
+- Always write config.txt to script directory
 - Use Docker for hosting FastAPI-DLS (licensing)
 - Create Powershell (ps1) and Bash (sh) files to retrieve licenses from FastAPI-DLS
