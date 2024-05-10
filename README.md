@@ -3,7 +3,7 @@ This is a little Bash script that configures a Proxmox 7 or 8 server to use Nvid
 For further instructions see my blogpost at https://wvthoog.nl/proxmox-7-vgpu-v3/
 
 Changes in version 1.1
-- Added new driver version
+- Added new driver versions
     16.2
     16.4
     17.0

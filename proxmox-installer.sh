@@ -174,6 +174,7 @@ configure_fastapi_dls() {
         echo ""
         read -p "$(echo -e "${BLUE}[?]${NC} Enter the desired port number for FastAPI-DLS (default is 8443): ")" portnumber
         portnumber=${portnumber:-8443}
+        echo -e "${RED}[!]${NC} Don't use port 80 or 443 since Proxmox is using those ports"
         echo ""
 
         echo -e "${GREEN}[+]${NC} Generate Docker YAML compose file"
@@ -184,7 +185,7 @@ version: '3.9'
 x-dls-variables: &dls-variables
   TZ: $timezone
   DLS_URL: $hostname
-  DLS_PORT: 443
+  DLS_PORT: $portnumber
   LEASE_EXPIRE_DAYS: 90  # 90 days is maximum
   DATABASE: sqlite:////app/database/db.sqlite
   DEBUG: "false"
@@ -501,9 +502,13 @@ case $STEP in
                         description=$(echo "$query_result" | cut -d '|' -f 3)
                         vgpu=$(echo "$query_result" | cut -d '|' -f 4)
                         driver=$(echo "$query_result" | cut -d '|' -f 5 | tr ';' ',')
-
-                        # echo "Driver: $driver"
                         chip=$(echo "$query_result" | cut -d '|' -f 6)
+
+                        if [[ -z "$chip" ]]; then
+                            chip="Unknown"
+                        fi
+
+                        #echo "Driver: $driver"                        
                         
                         case $vgpu in
                             No)
@@ -516,9 +521,11 @@ case $STEP in
                                 if [[ "$VGPU_SUPPORT" == "No" ]]; then
                                     gpu_info="is vGPU capable through vgpu_unlock with driver version $driver"
                                     VGPU_SUPPORT="Yes"
+                                    echo "info1: $driver"  
                                 elif [[ "$VGPU_SUPPORT" == "Unknown" ]]; then
                                     gpu_info="is vGPU capable through vgpu_unlock with driver version $driver"
                                     VGPU_SUPPORT="Yes"
+                                    echo "info2: $driver"  
                                 fi
                                 ;;
                             Native)
